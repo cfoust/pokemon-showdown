@@ -48,7 +48,9 @@ export class Tools {
 			text = text.roomid;
 		}
 		if (typeof text !== 'string' && typeof text !== 'number') return '';
-		return ('' + text).toLowerCase().replace(/[^a-z0-9]+/g, '') as ID;
+    // This is some hackus pocus to make regex string replacements work.
+    // @ts-ignore
+		return ('' + text).toLowerCase().replace('[^a-z0-9]', '', true) as ID;
 	}
 	/* eslint-enable @typescript-eslint/prefer-optional-chain */
 }

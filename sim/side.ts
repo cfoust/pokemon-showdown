@@ -347,7 +347,10 @@ export class Side {
 		let moveid = '';
 		let targetType = '';
 		if (autoChoose) moveText = 1;
-		if (typeof moveText === 'number' || (moveText && /^[0-9]+$/.test(moveText))) {
+    // This is some hackus pocus to make regex string replacements work.
+    // @ts-ignore
+    const left = typeof moveText === 'string' && moveText.replace('[0-9]', '', true).length === 0
+		if (typeof moveText === 'number' || left) {
 			// Parse a one-based move index.
 			const moveIndex = Number(moveText) - 1;
 			if (moveIndex < 0 || moveIndex >= request.moves.length || !request.moves[moveIndex]) {
@@ -778,14 +781,17 @@ export class Side {
 			case 'move':
 				const original = data;
 				const error = () => this.emitChoiceError(`Conflicting arguments for "move": ${original}`);
-				let targetLoc: number | undefined;
+				let targetLoc: number | undefined = undefined;
 				let megaDynaOrZ: 'mega' | 'zmove' | 'ultra' | 'dynamax' | '' = '';
 				while (true) {
 					// If data ends with a number, treat it as a target location.
 					// We need to special case 'Conversion 2' so it doesn't get
 					// confused with 'Conversion' erroneously sent with the target
 					// '2' (since Conversion targets 'self', targetLoc can't be 2).
-					if (/\s(?:-|\+)?[1-3]$/.test(data) && toID(data) !== 'conversion2') {
+          // This is some hackus pocus to make regex string replacements work.
+          // @ts-ignore
+          const left = data.replace('\s(?:-|\+)?[1-3]$', '', true).length === 0
+					if (left && toID(data) !== 'conversion2') {
 						if (targetLoc !== undefined) return error();
 						targetLoc = parseInt(data.slice(-2));
 						data = data.slice(0, -2).trim();

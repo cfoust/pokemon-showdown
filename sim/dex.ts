@@ -28,17 +28,26 @@
  * @license MIT license
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-
 import * as Data from './dex-data';
 import {PRNG, PRNGSeed} from './prng';
 
 const BASE_MOD = 'gen8' as ID;
 const DEFAULT_MOD = BASE_MOD;
-const DATA_DIR = path.resolve(__dirname, '../.data-dist');
-const MODS_DIR = path.resolve(__dirname, '../.data-dist/mods');
-const FORMATS = path.resolve(__dirname, '../config/formats');
+const DATA_DIR = ''
+const MODS_DIR = 'mods'
+
+import * as BASE_ABILITIES from '../data/abilities'
+import * as BASE_ITEMS from '../data/items'
+
+const DATA_FILESYSTEM: {[path: string]: AnyObject} = {
+  '/abilities': BASE_ABILITIES,
+  '/items': BASE_ITEMS,
+}
+
+function dataRequire(target: string): AnyObject {
+  print(target)
+  return DATA_FILESYSTEM[target]
+}
 
 const dexes: {[mod: string]: ModdedDex} = {}
 
@@ -264,16 +273,10 @@ export class ModdedDex {
 	 */
 	getName(name: any): string {
 		if (typeof name !== 'string' && typeof name !== 'number') return '';
-		name = ('' + name).replace(/[|\s[\],\u202e]+/g, ' ').trim();
+    // This is some hackus pocus to make regex string replacements work.
+    // @ts-ignore
+		name = ('' + name).replace("[|\s[\]]", ' ', true).trim();
 		if (name.length > 18) name = name.substr(0, 18).trim();
-
-		// remove zalgo
-		name = name.replace(
-			// eslint-disable-next-line max-len
-			/[\u0300-\u036f\u0483-\u0489\u0610-\u0615\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06ED\u0E31\u0E34-\u0E3A\u0E47-\u0E4E]{3,}/g,
-			''
-		);
-		name = name.replace(/[\u239b-\u23b9]/g, '');
 
 		return name;
 	}
@@ -478,9 +481,10 @@ export class ModdedDex {
 			}
 			return move;
 		}
-		if (id.substr(0, 11) === 'hiddenpower') {
-			id = /([a-z]*)([0-9]*)/.exec(id)![1] as ID;
-		}
+    // TODO(cfoust): 05/22/20 this probably doesn't matter
+		//if (id.substr(0, 11) === 'hiddenpower') {
+			//id = /([a-z]*)([0-9]*)/.exec(id)![1] as ID;
+		//}
 		if (id && this.data.Movedex.hasOwnProperty(id)) {
 			move = new Data.Move({name}, this.data.Movedex[id]);
 			if (move.gen > this.gen) {
@@ -577,7 +581,9 @@ export class ModdedDex {
 		const customRules = customRulesString.split(',').map(rule => {
 			const ruleSpec = this.validateRule(rule);
 			if (typeof ruleSpec === 'string' && ruleTable.has(ruleSpec)) return null;
-			return rule.replace(/[\r\n|]*/g, '').trim();
+      // This is some hackus pocus to make regex string replacements work.
+      // @ts-ignore
+      return rule.replace("[\r\n|]", '', true).trim();
 		}).filter(rule => rule);
 		if (!customRules.length) throw new Error(`The format already has your custom rules`);
 		const validatedFormatid = format.id + '@@@' + customRules.join(',');
@@ -950,10 +956,17 @@ export class ModdedDex {
 			if (format?.team) throw new Error(`We don't currently support bans in generated teams`);
 			if (rule.slice(1).includes('>') || rule.slice(1).includes('+')) {
 				let buf = rule.slice(1);
-        print('asd')
-				const gtIndex = buf.lastIndexOf('>');
+        let gtIndex = -1
+        for (let i = 0; i < buf.length; i++) {
+          if (buf[i] === '>') {
+            gtIndex = i
+          }
+        }
 				let limit = rule.charAt(0) === '+' ? Infinity : 0;
-				if (gtIndex >= 0 && /^[0-9]+$/.test(buf.slice(gtIndex + 1).trim())) {
+        // This is some hackus pocus to make regex string replacements work.
+        // @ts-ignore
+        const left = buf.slice(gtIndex + 1).trim().replace('[0-9]', '', true).length === 0
+				if (gtIndex >= 0 && left) {
 					if (limit === 0) limit = parseInt(buf.slice(gtIndex + 1));
 					buf = buf.slice(0, gtIndex);
 				}
@@ -1123,8 +1136,7 @@ export class ModdedDex {
 	}
 
 	getTeamGenerator(format: Format | string, seed: PRNG | PRNGSeed | null = null) {
-		// eslint-disable-next-line @typescript-eslint/no-var-requires
-		const TeamGenerator = require(dexes['base'].forFormat(format).dataDir + '/random-teams').default;
+		const TeamGenerator = dataRequire(dexes['base'].forFormat(format).dataDir + '/random-teams').default;
 		return new TeamGenerator(format, seed);
 	}
 
@@ -1417,8 +1429,7 @@ export class ModdedDex {
 	loadDataFile(basePath: string, dataType: DataType | 'Aliases'): AnyObject {
 		try {
 			const filePath = basePath + DATA_FILES[dataType];
-			// eslint-disable-next-line @typescript-eslint/no-var-requires
-			const dataObject = require(filePath);
+			const dataObject = dataRequire(filePath);
 			const key = `Battle${dataType}`;
 			if (!dataObject || typeof dataObject !== 'object') {
 				throw new TypeError(`${filePath}, if it exists, must export a non-null object`);
@@ -1439,7 +1450,7 @@ export class ModdedDex {
 		if (!this.isBase) throw new Error(`This must be called on the base Dex`);
 		if (this.modsLoaded) return this;
 
-		for (const mod of fs.readdirSync(MODS_DIR)) {
+		for (const mod of ['gen3']) {
 			dexes[mod] = new ModdedDex(mod, true);
 		}
 		this.modsLoaded = true;
@@ -1536,47 +1547,6 @@ export class ModdedDex {
 	}
 
 	includeFormats(): ModdedDex {
-		if (!this.isBase) throw new Error(`This should only be run on the base mod`);
-		this.includeMods();
-		if (this.formatsCache) return this;
-
-		if (!this.formatsCache) this.formatsCache = {};
-
-		// Load formats
-		let Formats;
-		try {
-			Formats = require(FORMATS).Formats;
-		} catch (e) {
-			if (e.code !== 'MODULE_NOT_FOUND' && e.code !== 'ENOENT') {
-				throw e;
-			}
-		}
-		if (!Array.isArray(Formats)) {
-			throw new TypeError(`Exported property 'Formats' from "./config/formats.js" must be an array`);
-		}
-		let section = '';
-		let column = 1;
-		for (const [i, format] of Formats.entries()) {
-			const id = toID(format.name);
-			if (format.section) section = format.section;
-			if (format.column) column = format.column;
-			if (!format.name && format.section) continue;
-			if (!id) {
-				throw new RangeError(`Format #${i + 1} must have a name with alphanumeric characters, not '${format.name}'`);
-			}
-			if (!format.section) format.section = section;
-			if (!format.column) format.column = column;
-			if (this.formatsCache[id]) throw new Error(`Format #${i + 1} has a duplicate ID: '${id}'`);
-			format.effectType = 'Format';
-			format.baseRuleset = format.ruleset ? format.ruleset.slice() : [];
-			if (format.challengeShow === undefined) format.challengeShow = true;
-			if (format.searchShow === undefined) format.searchShow = true;
-			if (format.tournamentShow === undefined) format.tournamentShow = true;
-			if (format.mod === undefined) format.mod = 'gen8';
-			if (!dexes[format.mod]) throw new Error(`Format "${format.name}" requires nonexistent mod: '${format.mod}'`);
-			this.formatsCache[id] = format;
-		}
-
 		return this;
 	}
 }
