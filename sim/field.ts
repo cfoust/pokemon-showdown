@@ -7,6 +7,8 @@
 
 import {State} from './state';
 import {EffectState} from './pokemon';
+import {Dex} from './dex';
+const { getId: toID } = Dex
 
 export class Field {
 	readonly battle: Battle;

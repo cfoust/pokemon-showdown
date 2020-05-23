@@ -28,19 +28,6 @@
  * @license MIT license
  */
 
-// eslint-disable-next-line no-extend-native
-Object.defineProperty(Array.prototype, 'flatMap', {
-	value<T, U, W>(this: T[], callback: (this: W, item: T, index: number, array: T[]) => U[], thisArg: W): U[] {
-		const newArray = [];
-		for (let i = 0; i < this.length; i++) {
-			newArray.push(...callback.call(thisArg, this[i], i, this));
-		}
-		return newArray;
-	},
-	configurable: true,
-	writable: true,
-});
-
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -53,7 +40,7 @@ const DATA_DIR = path.resolve(__dirname, '../.data-dist');
 const MODS_DIR = path.resolve(__dirname, '../.data-dist/mods');
 const FORMATS = path.resolve(__dirname, '../config/formats');
 
-const dexes: {[mod: string]: ModdedDex} = Object.create(null);
+const dexes: {[mod: string]: ModdedDex} = {}
 
 type DataType =
 	'Abilities' | 'Formats' | 'FormatsData' | 'Items' | 'Learnsets' | 'Movedex' |
@@ -62,6 +49,14 @@ const DATA_TYPES: (DataType | 'Aliases')[] = [
 	'Abilities', 'Formats', 'FormatsData', 'Items', 'Learnsets', 'Movedex',
 	'Natures', 'Pokedex', 'Scripts', 'Statuses', 'TypeChart',
 ];
+
+export function flatMap<T, U>(items: T[], callback: (item: T, index: number, array: T[]) => U[]): U[] {
+  const newArray: U[] = [];
+  for (let i = 0; i < items.length; i++) {
+    newArray.push(...callback(items[i], i, items))
+  }
+  return newArray;
+}
 
 const DATA_FILES = {
 	Abilities: 'abilities',
@@ -533,7 +528,7 @@ export class ModdedDex {
 			effect = this.getItem(name.slice(5));
 		} else if (name.startsWith('ability:')) {
 			const ability = this.getAbility(name.slice(8));
-			effect = Object.assign(Object.create(ability), {id: 'ability:' + ability.id});
+			effect = Object.assign({}, ability, {id: 'ability:' + ability.id});
 		}
 		if (effect) {
 			this.effectCache.set(id, effect);
@@ -955,6 +950,7 @@ export class ModdedDex {
 			if (format?.team) throw new Error(`We don't currently support bans in generated teams`);
 			if (rule.slice(1).includes('>') || rule.slice(1).includes('+')) {
 				let buf = rule.slice(1);
+        print('asd')
 				const gtIndex = buf.lastIndexOf('>');
 				let limit = rule.charAt(0) === '+' ? Infinity : 0;
 				if (gtIndex >= 0 && /^[0-9]+$/.test(buf.slice(gtIndex + 1).trim())) {
@@ -1411,7 +1407,7 @@ export class ModdedDex {
 	deepClone(obj: any): any {
 		if (obj === null || typeof obj !== 'object') return obj;
 		if (Array.isArray(obj)) return obj.map(prop => this.deepClone(prop));
-		const clone = Object.create(Object.getPrototypeOf(obj));
+		const clone = Object.assign({}, obj);
 		for (const key of Object.keys(obj)) {
 			clone[key] = this.deepClone(obj[key]);
 		}

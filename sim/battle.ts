@@ -5,7 +5,6 @@
  * @license MIT
  */
 import {Dex} from './dex';
-global.toID = Dex.getId;
 import * as Data from './dex-data';
 import {Field} from './field';
 import {Pokemon, EffectState} from './pokemon';
@@ -13,6 +12,12 @@ import {PRNG, PRNGSeed} from './prng';
 import {Side} from './side';
 import {State} from './state';
 import {BattleQueue, Action} from './battle-queue';
+const { getId: toID } = Dex
+
+const __version = {
+  head: 'WOW-pokemon-showdown',
+  origin: 'git@github.com:cfoust/pokemon-showdown.git',
+}
 
 /** A Pokemon that has fainted. */
 interface FaintedPokemon {
@@ -158,8 +163,8 @@ export class Battle {
 		this.gameType = (format.gameType || 'singles');
 		this.field = new Field(this);
 		const isFourPlayer = this.gameType === 'multi' || this.gameType === 'free-for-all';
-		// @ts-ignore
-		this.sides = Array(isFourPlayer ? 4 : 2).fill(null!);
+    // @ts-ignore
+    this.sides = isFourPlayer ? [null, null, null, null] : [null, null]
 		this.prng = options.prng || new PRNG(options.seed || undefined);
 		this.prngSeed = this.prng.startingSeed.slice() as PRNGSeed;
 		this.rated = options.rated || !!options.rated;
@@ -220,26 +225,27 @@ export class Battle {
 			formatid: options.formatid, seed: this.prng.seed,
 		};
 		if (this.rated) inputOptions.rated = this.rated;
-		if (global.__version) {
-			if (global.__version.head) {
-				this.inputLog.push(`>version ${global.__version.head}`);
+		if (__version) {
+			if (__version.head) {
+				this.inputLog.push(`>version ${__version.head}`);
 			}
-			if (global.__version.origin) {
-				this.inputLog.push(`>version-origin ${global.__version.origin}`);
+			if (__version.origin) {
+				this.inputLog.push(`>version-origin ${__version.origin}`);
 			}
 		}
 		this.inputLog.push(`>start ` + JSON.stringify(inputOptions));
 
 		for (const rule of this.ruleTable.keys()) {
-			if (rule.startsWith('+') || rule.startsWith('-') || rule.startsWith('!')) continue;
-			const subFormat = this.dex.getFormat(rule);
-			if (subFormat.exists) {
-				const hasEventHandler = Object.keys(subFormat).some(
-					val => val.startsWith('on') && !['onBegin', 'onValidateTeam', 'onChangeSet', 'onValidateSet'].includes(val)
-				);
-				if (hasEventHandler) this.field.addPseudoWeather(rule);
-			}
-		}
+      if (!rule.startsWith('+') && !rule.startsWith('-') && !rule.startsWith('!')) {
+        const subFormat = this.dex.getFormat(rule);
+        if (subFormat.exists) {
+          const hasEventHandler = Object.keys(subFormat).some(
+            val => val.startsWith('on') && !['onBegin', 'onValidateTeam', 'onChangeSet', 'onValidateSet'].includes(val)
+          );
+          if (hasEventHandler) this.field.addPseudoWeather(rule);
+        }
+      }
+    }
 		const sides: SideID[] = ['p1', 'p2', 'p3', 'p4'];
 		for (const side of sides) {
 			if (options[side]) {
@@ -346,9 +352,10 @@ export class Battle {
 			// grab list of next indexes
 			for (let i = sorted + 1; i < list.length; i++) {
 				const delta = comparator(list[nextIndexes[0]], list[i]);
-				if (delta < 0) continue;
-				if (delta > 0) nextIndexes = [i];
-				if (delta === 0) nextIndexes.push(i);
+				if (delta >= 0) {
+          if (delta > 0) nextIndexes = [i];
+          if (delta === 0) nextIndexes.push(i);
+        }
 			}
 			// put list of next indexes where they belong
 			const nextCount = nextIndexes.length;
@@ -392,8 +399,9 @@ export class Battle {
 		for (const side of this.sides) {
 			handlers = handlers.concat(this.findSideEventHandlers(side, callbackName, 'duration'));
 			for (const active of side.active) {
-				if (!active) continue;
-				handlers = handlers.concat(this.findPokemonEventHandlers(active, callbackName, 'duration'));
+				if (active) {
+          handlers = handlers.concat(this.findPokemonEventHandlers(active, callbackName, 'duration'));
+        }
 			}
 		}
 		this.speedSort(handlers);
@@ -401,18 +409,22 @@ export class Battle {
 			const handler = handlers[0];
 			handlers.shift();
 			const effect = handler.effect;
-			if ((handler.effectHolder as Pokemon).fainted) continue;
-			if (handler.state && handler.state.duration) {
-				handler.state.duration--;
-				if (!handler.state.duration) {
-					const endCallArgs = handler.endCallArgs || [handler.effectHolder, effect.id];
-					handler.end!.call(...endCallArgs as [any, ...any[]]);
-					continue;
-				}
-			}
-			this.singleEvent(eventid, effect, handler.state, handler.effectHolder, relayVar);
-			this.faintMessages();
-			if (this.ended) return;
+			if (!(handler.effectHolder as Pokemon).fainted) {
+        let toContinue = false
+        if (handler.state && handler.state.duration) {
+          handler.state.duration--;
+          if (!handler.state.duration) {
+            const endCallArgs = handler.endCallArgs || [handler.effectHolder, effect.id];
+            handler.end!.call(...endCallArgs as [any, ...any[]]);
+            toContinue = true
+          }
+        }
+        if (!toContinue) {
+          this.singleEvent(eventid, effect, handler.state, handler.effectHolder, relayVar);
+          this.faintMessages();
+          if (this.ended) return;
+        }
+      }
 		}
 	}
 
@@ -653,10 +665,11 @@ export class Battle {
 			}
 		}
 		for (const handler of handlers) {
+      let shouldContinue = false
 			if (handler.index !== undefined) {
-				// TODO: find a better way to do this
 				if (!targetRelayVars[handler.index] && !(targetRelayVars[handler.index] === 0 &&
-					eventid === 'DamagingHit')) continue;
+					eventid === 'DamagingHit')) {
+        }
 				if (handler.target) {
 					args[hasRelayVar] = handler.target;
 					this.event.target = handler.target;
@@ -1107,7 +1120,10 @@ export class Battle {
 
 	getRequests(type: RequestState, maxTeamSize: number) {
 		// default to no request
-		const requests: any[] = Array(this.sides.length).fill(null);
+		const requests: any[] = []
+    for (let i = 0; i < this.sides.length; i++) {
+      requests.push(null)
+    }
 
 		switch (type) {
 		case 'switch': {
@@ -1238,7 +1254,6 @@ export class Battle {
 
 		const side = pokemon.side;
 		if (pos >= side.active.length) {
-			console.log(this.getDebugLog());
 			throw new Error(`Invalid switch position ${pos} / ${side.active.length}`);
 		}
 		const oldActive = side.active[pos];
@@ -2877,29 +2892,6 @@ export class Battle {
 		if (this.debugMode) {
 			this.add('debug', activity);
 		}
-	}
-
-	static extractUpdateForSide(data: string, side: SideID | 'spectator' | 'omniscient' = 'spectator') {
-		if (side === 'omniscient') {
-			// Grab all secret data
-			return data.replace(/\n\|split\|p[1234]\n([^\n]*)\n(?:[^\n]*)/g, '\n$1');
-		}
-
-		// Grab secret data side has access to
-		switch (side) {
-		case 'p1': data = data.replace(/\n\|split\|p1\n([^\n]*)\n(?:[^\n]*)/g, '\n$1'); break;
-		case 'p2': data = data.replace(/\n\|split\|p2\n([^\n]*)\n(?:[^\n]*)/g, '\n$1'); break;
-		case 'p3': data = data.replace(/\n\|split\|p3\n([^\n]*)\n(?:[^\n]*)/g, '\n$1'); break;
-		case 'p4': data = data.replace(/\n\|split\|p4\n([^\n]*)\n(?:[^\n]*)/g, '\n$1'); break;
-		}
-
-		// Discard remaining secret data
-		// Note: the last \n? is for secret data that are empty when shared
-		return data.replace(/\n\|split\|(?:[^\n]*)\n(?:[^\n]*)\n\n?/g, '\n');
-	}
-
-	getDebugLog() {
-		return Battle.extractUpdateForSide(this.log.join('\n'), 'omniscient');
 	}
 
 	debugError(activity: string) {

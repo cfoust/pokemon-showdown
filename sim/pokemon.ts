@@ -6,6 +6,8 @@
  */
 
 import {State} from './state';
+import {Dex, flatMap} from './dex';
+const { getId: toID } = Dex
 
 /** A Pokemon's move slot. */
 interface MoveSlot {
@@ -577,8 +579,8 @@ export class Pokemon {
 		let allies = this.side.active;
 		if (this.battle.gameType === 'multi') {
 			const team = this.side.n % 2;
-			// @ts-ignore
-			allies = this.battle.sides.flatMap(
+			allies = flatMap(
+        this.battle.sides,
 				(side: Side) => side.n % 2 === team ? side.active : []
 			);
 		}
@@ -593,8 +595,8 @@ export class Pokemon {
 		let foes = this.side.foe.active;
 		if (this.battle.gameType === 'multi') {
 			const team = this.side.foe.n % 2;
-			// @ts-ignore
-			foes = this.battle.sides.flatMap(
+			foes = flatMap(
+        this.battle.sides,
 				(side: Side) => side.n % 2 === team ? side.active : []
 			);
 		}

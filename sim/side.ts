@@ -7,6 +7,8 @@
 import {RequestState} from './battle';
 import {Pokemon, EffectState} from './pokemon';
 import {State} from './state';
+import {Dex} from './dex';
+const { getId: toID } = Dex
 
 /** A single action that can be chosen. */
 export interface ChosenAction {

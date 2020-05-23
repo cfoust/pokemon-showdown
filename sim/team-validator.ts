@@ -8,6 +8,7 @@
  */
 
 import {Dex} from './dex';
+const { getId: toID } = Dex
 
 /**
  * Describes a possible way to get a pokemon. Is not exhaustive!
