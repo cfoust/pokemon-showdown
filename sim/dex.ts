@@ -39,10 +39,14 @@ const MODS_DIR = 'mods'
 import * as BASE_ABILITIES from '../data/abilities'
 import * as BASE_ITEMS from '../data/items'
 import * as BASE_SCRIPTS from '../data/scripts'
+import * as BASE_LEARNSETS from '../data/learnsets'
+import * as BASE_MOVES from '../data/moves'
 
 const DATA_FILESYSTEM: {[path: string]: AnyObject} = {
   '/abilities': BASE_ABILITIES,
   '/items': BASE_ITEMS,
+  '/learnsets': BASE_LEARNSETS,
+  '/moves': BASE_MOVES,
   '/scripts': BASE_SCRIPTS,
 }
 
@@ -60,14 +64,6 @@ const DATA_TYPES: (DataType | 'Aliases')[] = [
 	'Natures', 'Pokedex', 'Scripts', 'Statuses', 'TypeChart',
 ];
 
-export function flatMap<T, U>(items: T[], callback: (item: T, index: number, array: T[]) => U[]): U[] {
-  const newArray: U[] = [];
-  for (let i = 0; i < items.length; i++) {
-    newArray.push(...callback(items[i], i, items))
-  }
-  return newArray;
-}
-
 const DATA_FILES = {
 	Abilities: 'abilities',
 	Aliases: 'aliases',
@@ -82,6 +78,14 @@ const DATA_FILES = {
 	Statuses: 'statuses',
 	TypeChart: 'typechart',
 };
+
+export function flatMap<T, U>(items: T[], callback: (item: T, index: number, array: T[]) => U[]): U[] {
+  const newArray: U[] = [];
+  for (let i = 0; i < items.length; i++) {
+    newArray.push(...callback(items[i], i, items))
+  }
+  return newArray;
+}
 
 const nullEffect: PureEffect = new Data.PureEffect({name: '', exists: false});
 

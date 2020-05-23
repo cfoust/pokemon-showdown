@@ -25,6 +25,9 @@ snatch: Can be stolen from the original user and instead used by another Pokemon
 sound: Has no effect on Pokemon with the Soundproof Ability.
 
 */
+import * as Data from '../sim/dex-data';
+
+const toID = Data.Tools.getId;
 
 export const BattleMovedex: {[moveid: string]: MoveData} = {
 	"10000000voltthunderbolt": {
@@ -10215,7 +10218,7 @@ export const BattleMovedex: {[moveid: string]: MoveData} = {
 			onStart(side, source) {
 				this.debug('Lunar Dance started on ' + side.name);
 				this.effectData.positions = [];
-				for (const i of side.active.keys()) {
+				for (const [i] of side.active.entries()) {
 					this.effectData.positions[i] = false;
 				}
 				this.effectData.positions[source.position] = true;
