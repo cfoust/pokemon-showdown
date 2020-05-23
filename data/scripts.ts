@@ -1,5 +1,9 @@
 const CHOOSABLE_TARGETS = new Set(['normal', 'any', 'adjacentAlly', 'adjacentAllyOrSelf', 'adjacentFoe']);
 
+import * as Data from '../sim/dex-data';
+
+const toID = Data.Tools.getId;
+
 export const BattleScripts: BattleScriptsData = {
 	gen: 8,
 	/**
@@ -371,7 +375,11 @@ export const BattleScripts: BattleScriptsData = {
 	},
 	hitStepInvulnerabilityEvent(targets, pokemon, move) {
 		if (move.id === 'helpinghand' || (this.gen >= 6 && move.id === 'toxic' && pokemon.hasType('Poison'))) {
-			return new Array(targets.length).fill(true);
+      const result: boolean[] = []
+      for (let i = 0; i < targets.length; i++) {
+        result.push(true)
+      }
+			return result
 		}
 		const hitResults = this.runEvent('Invulnerability', targets, pokemon, move);
 		for (const [i, target] of targets.entries()) {
@@ -392,7 +400,7 @@ export const BattleScripts: BattleScriptsData = {
 			this.add('-fail', pokemon);
 			this.attrLastMove('[still]');
 		}
-		for (const i of targets.keys()) {
+		for (const [i,] of targets.entries()) {
 			if (hitResults[i] !== this.NOT_FAIL) hitResults[i] = hitResults[i] || false;
 		}
 		return hitResults;
@@ -403,7 +411,7 @@ export const BattleScripts: BattleScriptsData = {
 		}
 
 		const hitResults = [];
-		for (const i of targets.keys()) {
+		for (const [i,] of targets.entries()) {
 			hitResults[i] = (move.ignoreImmunity && (move.ignoreImmunity === true || move.ignoreImmunity[move.type])) ||
 				targets[i].runImmunity(move.type, !move.smartTarget);
 			if (move.smartTarget && !hitResults[i]) move.smartTarget = false;
@@ -596,8 +604,8 @@ export const BattleScripts: BattleScriptsData = {
 		return this.moveHit(target, pokemon, move);
 	},
 	hitStepMoveHitLoop(targets, pokemon, move) { // Temporary name
-		const damage: (number | boolean | undefined)[] = [];
-		for (const i of targets.keys()) {
+		let damage: (number | boolean | undefined)[] = [];
+		for (const [i,] of targets.entries()) {
 			damage[i] = 0;
 		}
 		move.totalDamage = 0;
@@ -701,8 +709,20 @@ export const BattleScripts: BattleScriptsData = {
 			}
 		}
 		// hit is 1 higher than the actual hit count
-		if (hit === 1) return damage.fill(false);
-		if (nullDamage) damage.fill(false);
+		if (hit === 1) {
+      const result: boolean[] = []
+      for (let i = 0; i < damage.length; i++) {
+        result.push(false)
+      }
+      return result;
+    }
+		if (nullDamage) {
+      const result: boolean[] = []
+      for (let i = 0; i < damage.length; i++) {
+        result.push(false)
+      }
+      damage = result
+    }
 		if (move.multihit && typeof move.smartTarget !== 'boolean') {
 			this.add('-hitcount', targets[0], hit - 1);
 		}
@@ -758,7 +778,7 @@ export const BattleScripts: BattleScriptsData = {
 		// (no spread moves have any kind of onTryHit handler)
 		const target = targets[0];
 		let damage: (number | boolean | undefined)[] = [];
-		for (const i of targets.keys()) {
+		for (const [i,] of targets.entries()) {
 			damage[i] = true;
 		}
 		const move = this.dex.getActiveMove(moveOrMoveName);
@@ -787,7 +807,7 @@ export const BattleScripts: BattleScriptsData = {
 			}
 		}
 
-		for (const i of targets.keys()) {
+		for (const [i] of targets.entries()) {
 			if (damage[i] === this.HIT_SUBSTITUTE) {
 				damage[i] = true;
 				targets[i] = null;
@@ -800,14 +820,14 @@ export const BattleScripts: BattleScriptsData = {
 		// 1. call to this.getDamage
 		damage = this.getSpreadDamage(damage, targets, pokemon, move, moveData, isSecondary, isSelf);
 
-		for (const i of targets.keys()) {
+		for (const [i] of targets.entries()) {
 			if (damage[i] === false) targets[i] = false;
 		}
 
 		// 2. call to this.spreadDamage
 		damage = this.spreadDamage(damage, targets, pokemon, move);
 
-		for (const i of targets.keys()) {
+		for (const [i] of targets.entries()) {
 			if (!damage && damage !== 0) {
 				this.debug('damage interrupted');
 				targets[i] = false;
@@ -817,7 +837,7 @@ export const BattleScripts: BattleScriptsData = {
 		// 3. onHit event happens here
 		damage = this.runMoveEffects(damage, targets, pokemon, move, moveData, isSecondary, isSelf);
 
-		for (const i of targets.keys()) {
+		for (const [i] of targets.entries()) {
 			if (!damage[i] && damage[i] !== 0) targets[i] = false;
 		}
 
@@ -830,7 +850,7 @@ export const BattleScripts: BattleScriptsData = {
 		// 6. force switch
 		if (moveData.forceSwitch) damage = this.forceSwitch(damage, targets, pokemon, move, moveData, isSecondary, isSelf);
 
-		for (const i of targets.keys()) {
+		for (const [i] of targets.entries()) {
 			if (!damage[i] && damage[i] !== 0) targets[i] = false;
 		}
 
@@ -929,7 +949,7 @@ export const BattleScripts: BattleScriptsData = {
 						continue;
 					}
 					const amount = target.baseMaxhp * moveData.heal[0] / moveData.heal[1];
-					const d = target.heal((this.gen < 5 ? Math.floor : Math.round)(amount));
+					const d = target.heal(this.gen < 5 ? Math.floor(amount) : Math.round(amount));
 					if (!d && d !== 0) {
 						this.add('-fail', pokemon);
 						this.attrLastMove('[still]');
@@ -1193,11 +1213,6 @@ export const BattleScripts: BattleScriptsData = {
 		const species = pokemon.baseSpecies;
 		const altForme = species.otherFormes && this.dex.getSpecies(species.otherFormes[0]);
 		const item = pokemon.getItem();
-		// Mega Rayquaza
-		if (altForme?.isMega && altForme?.requiredMove &&
-			pokemon.baseMoves.includes(toID(altForme.requiredMove)) && !item.zMove) {
-			return altForme.name;
-		}
 		// a hacked-in Megazard X can mega evolve into Megazard Y, but not into Megazard X
 		if (item.megaEvolves === species.baseSpecies && item.megaStone !== species.name) {
 			return item.megaStone;
@@ -1310,7 +1325,7 @@ export const BattleScripts: BattleScriptsData = {
 				break;
 			case 'clearnegativeboost':
 				const boosts: SparseBoostsTable = {};
-				let i: BoostName;
+				let i: BoostName = 'evasion';
 				for (i in pokemon.boosts) {
 					if (pokemon.boosts[i] < 0) {
 						boosts[i] = 0;

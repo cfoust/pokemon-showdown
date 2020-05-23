@@ -38,14 +38,15 @@ const MODS_DIR = 'mods'
 
 import * as BASE_ABILITIES from '../data/abilities'
 import * as BASE_ITEMS from '../data/items'
+import * as BASE_SCRIPTS from '../data/scripts'
 
 const DATA_FILESYSTEM: {[path: string]: AnyObject} = {
   '/abilities': BASE_ABILITIES,
   '/items': BASE_ITEMS,
+  '/scripts': BASE_SCRIPTS,
 }
 
-function dataRequire(target: string): AnyObject {
-  print(target)
+function dataRequire(target: string): AnyObject | undefined {
   return DATA_FILESYSTEM[target]
 }
 
@@ -1136,7 +1137,9 @@ export class ModdedDex {
 	}
 
 	getTeamGenerator(format: Format | string, seed: PRNG | PRNGSeed | null = null) {
-		const TeamGenerator = dataRequire(dexes['base'].forFormat(format).dataDir + '/random-teams').default;
+    const data = dataRequire(dexes['base'].forFormat(format).dataDir + '/random-teams')
+    if (!data || !('default' in data)) return null
+		const TeamGenerator = data.default;
 		return new TeamGenerator(format, seed);
 	}
 
@@ -1426,24 +1429,14 @@ export class ModdedDex {
 		return clone;
 	}
 
-	loadDataFile(basePath: string, dataType: DataType | 'Aliases'): AnyObject {
-		try {
-			const filePath = basePath + DATA_FILES[dataType];
-			const dataObject = dataRequire(filePath);
-			const key = `Battle${dataType}`;
-			if (!dataObject || typeof dataObject !== 'object') {
-				throw new TypeError(`${filePath}, if it exists, must export a non-null object`);
-			}
-			if (dataObject[key]?.constructor?.name !== 'Object') {
-				throw new TypeError(`${filePath}, if it exists, must export an object whose '${key}' property is an Object`);
-			}
-			return dataObject[key];
-		} catch (e) {
-			if (e.code !== 'MODULE_NOT_FOUND' && e.code !== 'ENOENT') {
-				throw e;
-			}
-		}
-		return {};
+  loadDataFile(basePath: string, dataType: DataType | 'Aliases'): AnyObject {
+    const filePath = basePath + DATA_FILES[dataType];
+    const dataObject = dataRequire(filePath);
+    const key = `Battle${dataType}`;
+    if (dataObject && key in dataObject) {
+      return dataObject[key];
+    }
+    return {};
 	}
 
 	includeMods(): ModdedDex {
@@ -1481,7 +1474,7 @@ export class ModdedDex {
 		this.parentMod = this.isBase ? '' : (BattleScripts.inherit || 'base');
 
 		let parentDex;
-		if (this.parentMod) {
+		if (this.parentMod.length > 0) {
 			parentDex = dexes[this.parentMod];
 			if (!parentDex || parentDex === this) {
 				throw new Error(
