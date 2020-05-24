@@ -5098,7 +5098,7 @@ export const BattleMovedex: {[moveid: string]: MoveData} = {
 		priority: 0,
 		flags: {protect: 1, mirror: 1, nonsky: 1},
 		onPrepareHit(target, source, move) {
-			for (const action of this.queue) {
+			for (const action of this.queue.actions) {
 				if (
 					// @ts-ignore
 					!action.move || !action.pokemon || !action.pokemon.isActive ||
@@ -7242,7 +7242,7 @@ export const BattleMovedex: {[moveid: string]: MoveData} = {
 		priority: 0,
 		flags: {protect: 1, mirror: 1, nonsky: 1},
 		onPrepareHit(target, source, move) {
-			for (const action of this.queue) {
+			for (const action of this.queue.actions) {
 				if (
 					// @ts-ignore
 					!action.move || !action.pokemon || !action.pokemon.isActive ||
@@ -14057,10 +14057,10 @@ export const BattleMovedex: {[moveid: string]: MoveData} = {
 					// Run through each action in queue to check if the Pursuit user is supposed to Mega Evolve this turn.
 					// If it is, then Mega Evolve before moving.
 					if (source.canMegaEvo || source.canUltraBurst) {
-						for (const [actionIndex, action] of this.queue.entries()) {
+						for (const [actionIndex, action] of this.queue.actions.entries()) {
 							if (action.pokemon === source && action.choice === 'megaEvo') {
 								this.runMegaEvo(source);
-								this.queue.splice(actionIndex, 1);
+								this.queue.actions.splice(actionIndex, 1);
 								break;
 							}
 						}
@@ -15129,7 +15129,7 @@ export const BattleMovedex: {[moveid: string]: MoveData} = {
 		priority: 0,
 		flags: {protect: 1, mirror: 1, sound: 1, authentic: 1},
 		onTry(target, source, move) {
-			for (const action of this.queue) {
+			for (const action of this.queue.actions) {
 				// @ts-ignore
 				if (!action.pokemon || !action.move || action.maxMove || action.zmove) continue;
 				// @ts-ignore
@@ -19782,7 +19782,7 @@ export const BattleMovedex: {[moveid: string]: MoveData} = {
 		priority: 0,
 		flags: {protect: 1, mirror: 1, nonsky: 1},
 		onPrepareHit(target, source, move) {
-			for (const action of this.queue) {
+			for (const action of this.queue.actions) {
 				if (action.choice !== 'move') continue;
 				const otherMove = action.move;
 				const otherMoveUser = action.pokemon;

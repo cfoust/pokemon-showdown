@@ -5,7 +5,6 @@
  * @license MIT license
  */
 
-import {State} from './state';
 import {Dex, flatMap} from './dex';
 const { getId: toID } = Dex
 
@@ -262,7 +261,8 @@ export class Pokemon {
 		}
 		this.speciesData = {id: this.species.id};
 
-		this.name = set.name.substr(0, 20);
+    const pokeName: string = set.name
+		this.name = pokeName.substr(0, 20);
 		this.fullname = this.side.id + ': ' + this.name;
 
 		set.level = this.battle.dex.clampIntRange(set.forcedLevel || set.level || 100, 1, 9999);
@@ -409,10 +409,6 @@ export class Pokemon {
 		this.hp = 0;
 		this.clearVolatile();
 		this.hp = this.maxhp;
-	}
-
-	toJSON(): AnyObject {
-		return State.serializePokemon(this);
 	}
 
 	get moves(): readonly string[] {

@@ -4,9 +4,8 @@
  *
  * @license MIT license
  */
-import {RequestState} from './battle';
+import {RequestState} from './types';
 import {Pokemon, EffectState} from './pokemon';
-import {State} from './state';
 import {Dex} from './dex';
 const { getId: toID } = Dex
 
@@ -126,10 +125,6 @@ export class Side {
 
 		// old-gens
 		this.lastMove = null;
-	}
-
-	toJSON(): AnyObject {
-		return State.serializeSide(this);
 	}
 
 	get requestState(): RequestState {

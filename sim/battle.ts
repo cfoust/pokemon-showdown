@@ -10,9 +10,9 @@ import {Field} from './field';
 import {Pokemon, EffectState} from './pokemon';
 import {PRNG, PRNGSeed} from './prng';
 import {Side} from './side';
-import {State} from './state';
 import {BattleQueue, Action} from './battle-queue';
 const { getId: toID } = Dex
+import {RequestState} from './types';
 
 const __version = {
   head: 'WOW-pokemon-showdown',
@@ -63,16 +63,6 @@ interface EventListener extends EventListenerWithoutPriority {
 }
 
 type Part = string | number | boolean | Pokemon | Side | Effect | Move | null | undefined;
-
-// The current request state of the Battle:
-//
-//   - 'teampreview': beginning of BW/XY/SM battle (Team Preview)
-//   - 'move': beginning of each turn
-//   - 'switch': end of turn if fainted (or mid turn with switching effects)
-//   - '': no request. Used between turns, or when the battle is over.
-//
-// An individual Side's request state is encapsulated in its `activeRequest` field.
-export type RequestState = 'teampreview' | 'move' | 'switch' | '';
 
 export class Battle {
 	readonly id: ID;
@@ -254,14 +244,6 @@ export class Battle {
 		}
 	}
 
-	toJSON(): AnyObject {
-		return State.serializeBattle(this);
-	}
-
-	static fromJSON(serialized: string | AnyObject): Battle {
-		return State.deserializeBattle(serialized);
-	}
-
 	get p1() {
 		return this.sides[0];
 	}
@@ -407,6 +389,7 @@ export class Battle {
 		this.speedSort(handlers);
 		while (handlers.length) {
 			const handler = handlers[0];
+      if (handler == null) break;
 			handlers.shift();
 			const effect = handler.effect;
 			if (!(handler.effectHolder as Pokemon).fainted) {
@@ -2575,7 +2558,7 @@ export class Battle {
 					// in gen 2-4, the switch still happens
 					this.hint("Previously chosen switches continue in Gen 2-4 after a Pursuit target faints.");
 					action.priority = -101;
-					this.queue.unshift(action);
+					this.queue.actions.unshift(action);
 					break;
 				} else {
 					// in gen 5+, the switch is cancelled
@@ -2639,23 +2622,23 @@ export class Battle {
 
 		// switching (fainted pokemon, U-turn, Baton Pass, etc)
 
-		if (!this.queue.length || (this.gen <= 3 && ['move', 'residual'].includes(this.queue[0].choice))) {
+		if (!this.queue.actions.length || (this.gen <= 3 && ['move', 'residual'].includes(this.queue.actions[0].choice))) {
 			// in gen 3 or earlier, switching in fainted pokemon is done after
 			// every move, rather than only at the end of the turn.
 			this.checkFainted();
 		} else if (action.choice === 'megaEvo' && this.gen === 7) {
 			this.eachEvent('Update');
 			// In Gen 7, the action order is recalculated for a Pokémon that mega evolves.
-			for (const [i, queuedAction] of this.queue.entries()) {
+			for (const [i, queuedAction] of this.queue.actions.entries()) {
 				if (queuedAction.pokemon === action.pokemon && queuedAction.choice === 'move') {
-					this.queue.splice(i, 1);
+					this.queue.actions.splice(i, 1);
 					queuedAction.mega = 'done';
 					this.queue.insertChoice(queuedAction, true);
 					break;
 				}
 			}
 			return false;
-		} else if (this.queue.length && this.queue[0].choice === 'instaswitch') {
+		} else if (this.queue.actions.length && this.queue.actions[0].choice === 'instaswitch') {
 			return false;
 		}
 
@@ -2692,10 +2675,10 @@ export class Battle {
 
 		if (this.gen < 5) this.eachEvent('Update');
 
-		if (this.gen >= 8 && this.queue.length && this.queue[0].choice === 'move') {
+		if (this.gen >= 8 && this.queue.actions.length && this.queue.actions[0].choice === 'move') {
 			// In gen 8, speed is updated dynamically so update the queue's speed properties and sort it.
 			this.updateSpeed();
-			for (const queueAction of this.queue) {
+			for (const queueAction of this.queue.actions) {
 				if (queueAction.pokemon) this.getActionSpeed(queueAction);
 			}
 			this.queue.sort();
@@ -2714,8 +2697,8 @@ export class Battle {
 			this.midTurn = true;
 		}
 
-		while (this.queue.length) {
-			const action = this.queue.shift()!;
+		while (this.queue.actions.length) {
+			const action = this.queue.actions.shift()!;
 			this.runAction(action);
 			if (this.requestState || this.ended) return;
 		}
@@ -2761,7 +2744,7 @@ export class Battle {
 	commitDecisions() {
 		this.updateSpeed();
 
-		const oldQueue = this.queue.slice();
+		const oldQueue = this.queue.actions.slice();
 		this.queue.clear();
 		if (!this.allChoicesDone()) throw new Error("Not all choices done");
 
@@ -2775,7 +2758,7 @@ export class Battle {
 		this.clearRequest();
 
 		this.queue.sort();
-		this.queue.push(...oldQueue);
+		this.queue.actions.push(...oldQueue);
 
 		this.requestState = '';
 		for (const side of this.sides) {
@@ -2951,7 +2934,13 @@ export class Battle {
 		this.add('player', side.id, side.name, side.avatar, options.rating || '');
 
 		// Start the battle if it's ready to start
-		if (this.sides.every(playerSide => !!playerSide) && !this.started) this.start();
+    if (
+      this.sides[0] != null &&
+      this.sides[1] != null &&
+      !this.started
+    ) {
+      this.start();
+    }
 	}
 
 	/** @deprecated */
@@ -3214,7 +3203,7 @@ export class Battle {
 				this.sides[i] = null!;
 			}
 		}
-		for (const action of this.queue) {
+		for (const action of this.queue.actions) {
 			delete action.pokemon;
 		}
 

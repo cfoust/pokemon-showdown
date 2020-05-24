@@ -122,12 +122,15 @@ export interface ActionChoice {
  *
  * Sort order is documented in `BattleQueue.comparePriority`.
  */
-export class BattleQueue extends Array<Action> {
+export class BattleQueue {
 	battle: Battle;
+  actions: Array<Action>
+
 	constructor(battle: Battle) {
-		super();
 		this.battle = battle;
+    this.actions = []
 	}
+
 	/**
 	 * Takes an ActionChoice, and fills it out into a full Action object.
 	 *
@@ -220,15 +223,15 @@ export class BattleQueue extends Array<Action> {
 	 * Makes the passed action happen next (skipping speed order).
 	 */
 	prioritizeAction(action: MoveAction | SwitchAction, sourceEffect?: Effect) {
-		for (const [i, curAction] of this.entries()) {
+		for (const [i, curAction] of this.actions.entries()) {
 			if (curAction === action) {
-				this.splice(i, 1);
+				this.actions.splice(i, 1);
 				break;
 			}
 		}
 		action.sourceEffect = sourceEffect;
 		action.order = 3;
-		this.unshift(action);
+		this.actions.unshift(action);
 	}
 
 	/**
@@ -247,12 +250,12 @@ export class BattleQueue extends Array<Action> {
 	addChoice(choices: ActionChoice | ActionChoice[]) {
 		if (!Array.isArray(choices)) choices = [choices];
 		for (const choice of choices) {
-			this.push(...this.resolveAction(choice));
+			this.actions.push(...this.resolveAction(choice));
 		}
 	}
 
 	willAct() {
-		for (const action of this) {
+		for (const action of this.actions) {
 			if (['move', 'switch', 'instaswitch', 'shift'].includes(action.choice)) {
 				return action;
 			}
@@ -262,7 +265,7 @@ export class BattleQueue extends Array<Action> {
 
 	willMove(pokemon: Pokemon) {
 		if (pokemon.fainted) return null;
-		for (const action of this) {
+		for (const action of this.actions) {
 			if (action.choice === 'move' && action.pokemon === pokemon) {
 				return action;
 			}
@@ -271,20 +274,20 @@ export class BattleQueue extends Array<Action> {
 	}
 
 	cancelAction(pokemon: Pokemon) {
-		const oldLength = this.length;
-		for (let i = 0; i < this.length; i++) {
-			if (this[i].pokemon === pokemon) {
-				this.splice(i, 1);
+		const oldLength = this.actions.length;
+		for (let i = 0; i < this.actions.length; i++) {
+			if (this.actions[i].pokemon === pokemon) {
+				this.actions.splice(i, 1);
 				i--;
 			}
 		}
-		return this.length !== oldLength;
+		return this.actions.length !== oldLength;
 	}
 
 	cancelMove(pokemon: Pokemon) {
-		for (const [i, action] of this.entries()) {
+		for (const [i, action] of this.actions.entries()) {
 			if (action.choice === 'move' && action.pokemon === pokemon) {
-				this.splice(i, 1);
+				this.actions.splice(i, 1);
 				return true;
 			}
 		}
@@ -292,7 +295,7 @@ export class BattleQueue extends Array<Action> {
 	}
 
 	willSwitch(pokemon: Pokemon) {
-		for (const action of this) {
+		for (const action of this.actions) {
 			if (['switch', 'instaswitch'].includes(action.choice) && action.pokemon === pokemon) {
 				return action;
 			}
@@ -318,17 +321,17 @@ export class BattleQueue extends Array<Action> {
 			choice.pokemon.updateSpeed();
 		}
 		const actions = this.resolveAction(choice, midTurn);
-		for (const [i, curAction] of this.entries()) {
+		for (const [i, curAction] of this.actions.entries()) {
 			if (BattleQueue.comparePriority(actions[0], curAction) < 0) {
-				this.splice(i, 0, ...actions);
+				this.actions.splice(i, 0, ...actions);
 				return;
 			}
 		}
-		this.push(...actions);
+		this.actions.push(...actions);
 	}
 
 	clear() {
-		this.splice(0);
+		this.actions.splice(0);
 	}
 
 	debug(action?: Action): string {
@@ -336,7 +339,7 @@ export class BattleQueue extends Array<Action> {
 			// @ts-ignore
 			return `${action.order || ''}:${action.priority || ''}:${action.speed || ''}:${action.subOrder || ''} - ${action.choice}${action.pokemon ? ' ' + action.pokemon : ''}${action.move ? ' ' + action.move : ''}`;
 		}
-		return this.map(
+		return this.actions.map(
 			queueAction => this.debug(queueAction)
 		).join('\n') + '\n';
 	}
@@ -345,7 +348,7 @@ export class BattleQueue extends Array<Action> {
 	sort(DO_NOT_USE_COMPARATORS?: never) {
 		if (DO_NOT_USE_COMPARATORS) throw new Error(`Battle queues can't be sorted with a custom comparator`);
 		// this.log.push('SORT ' + this.debugQueue());
-		this.battle.speedSort(this);
+		this.battle.speedSort(this.actions);
 		return this;
 	}
 

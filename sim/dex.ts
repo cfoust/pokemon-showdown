@@ -41,6 +41,20 @@ import * as BASE_ITEMS from '../data/items'
 import * as BASE_SCRIPTS from '../data/scripts'
 import * as BASE_LEARNSETS from '../data/learnsets'
 import * as BASE_MOVES from '../data/moves'
+import * as BASE_STATUSES from '../data/statuses'
+import * as BASE_TYPECHART from '../data/typechart'
+import * as BASE_POKEDEX from '../data/pokedex'
+
+import * as GEN3_ABILITIES from '../data/mods/gen3/abilities'
+import * as GEN3_ITEMS from '../data/mods/gen3/items'
+import * as GEN3_SCRIPTS from '../data/mods/gen3/scripts'
+import * as GEN3_MOVES from '../data/mods/gen3/moves'
+import * as GEN3_STATUSES from '../data/mods/gen3/statuses'
+
+import * as GEN4_SCRIPTS from '../data/mods/gen4/scripts'
+import * as GEN5_SCRIPTS from '../data/mods/gen5/scripts'
+import * as GEN6_SCRIPTS from '../data/mods/gen6/scripts'
+import * as GEN7_SCRIPTS from '../data/mods/gen7/scripts'
 
 const DATA_FILESYSTEM: {[path: string]: AnyObject} = {
   '/abilities': BASE_ABILITIES,
@@ -48,6 +62,20 @@ const DATA_FILESYSTEM: {[path: string]: AnyObject} = {
   '/learnsets': BASE_LEARNSETS,
   '/moves': BASE_MOVES,
   '/scripts': BASE_SCRIPTS,
+  '/statuses': BASE_STATUSES,
+  '/typechart': BASE_TYPECHART,
+  '/pokedex': BASE_POKEDEX,
+
+  'mods/gen3/abilities': GEN3_ABILITIES,
+  'mods/gen3/items': GEN3_ITEMS,
+  'mods/gen3/moves': GEN3_MOVES,
+  'mods/gen3/scripts': GEN3_SCRIPTS,
+  'mods/gen3/statuses': GEN3_STATUSES,
+
+  'mods/gen4/scripts': GEN4_SCRIPTS,
+  'mods/gen5/scripts': GEN5_SCRIPTS,
+  'mods/gen6/scripts': GEN6_SCRIPTS,
+  'mods/gen7/scripts': GEN7_SCRIPTS,
 }
 
 function dataRequire(target: string): AnyObject | undefined {
@@ -401,7 +429,7 @@ export class ModdedDex {
 					break;
 				}
 			}
-			if (aliasTo) {
+			if (aliasTo.length > 0) {
 				species = this.getSpecies(aliasTo);
 				if (species.exists) {
 					this.speciesCache.set(id, species);
@@ -1447,7 +1475,7 @@ export class ModdedDex {
 		if (!this.isBase) throw new Error(`This must be called on the base Dex`);
 		if (this.modsLoaded) return this;
 
-		for (const mod of ['gen3']) {
+		for (const mod of ['gen3', 'gen4', 'gen5', 'gen6', 'gen7']) {
 			dexes[mod] = new ModdedDex(mod, true);
 		}
 		this.modsLoaded = true;
@@ -1468,7 +1496,9 @@ export class ModdedDex {
 	}
 
 	loadData(): DexTableData {
-		if (this.dataCache) return this.dataCache;
+		if (this.dataCache != null) {
+      return this.dataCache;
+    }
 		dexes['base'].includeMods();
 		const dataCache: {[k in keyof DexTableData]?: any} = {};
 
@@ -1493,9 +1523,12 @@ export class ModdedDex {
 				continue;
 			}
 			const BattleData = this.loadDataFile(basePath, dataType);
-			if (BattleData !== dataCache[dataType]) dataCache[dataType] = Object.assign(BattleData, dataCache[dataType]);
+			if (BattleData !== dataCache[dataType]) {
+        dataCache[dataType] = Object.assign(BattleData, dataCache[dataType]);
+      }
 			if (dataType === 'Formats' && !parentDex) Object.assign(BattleData, this.formats);
 		}
+
 		if (!parentDex) {
 			// Formats are inherited by mods
 			this.includeFormats();
@@ -1504,19 +1537,15 @@ export class ModdedDex {
 				const parentTypedData: DexTable<any> = parentDex.data[dataType];
 				const childTypedData: DexTable<any> = dataCache[dataType] || (dataCache[dataType] = {});
 				for (const entryId in parentTypedData) {
-					if (childTypedData[entryId] === null) {
-						// null means don't inherit
-						delete childTypedData[entryId];
-					} else if (!(entryId in childTypedData)) {
-						// If it doesn't exist it's inherited from the parent data
-						if (dataType === 'Pokedex') {
-							// Pokedex entries can be modified too many different ways
-							// e.g. inheriting different formats-data/learnsets
-							childTypedData[entryId] = this.deepClone(parentTypedData[entryId]);
-						} else {
-							childTypedData[entryId] = parentTypedData[entryId];
-						}
-					} else if (childTypedData[entryId] && childTypedData[entryId].inherit) {
+					if (!(entryId in childTypedData)) {
+            childTypedData[entryId] = parentTypedData[entryId]
+					} else if (
+            typeof childTypedData === 'object' &&
+            (entryId in childTypedData) && 
+            typeof childTypedData[entryId] === 'object' &&
+            ('inherit' in childTypedData[entryId]) && 
+            childTypedData[entryId].inherit
+          ) {
 						// {inherit: true} can be used to modify only parts of the parent data,
 						// instead of overwriting entirely
 						delete childTypedData[entryId].inherit;
@@ -1538,14 +1567,43 @@ export class ModdedDex {
 		this.dataCache = dataCache as DexTableData;
 
 		// Execute initialization script.
-		if (BattleScripts.init) BattleScripts.init.call(this);
+		if (('init' in BattleScripts) && typeof BattleScripts.init === 'function') {
+      //BattleScripts.init.call(this)
+    }
 
 		return this.dataCache;
 	}
 
-	includeFormats(): ModdedDex {
-		return this;
-	}
+  includeFormats(): ModdedDex {
+    this.includeMods();
+
+    this.formatsCache = {
+      gen3: {
+        banlist: [],
+        baseRuleset: ['Standard'],
+        challengeShow: true,
+        customRules: null,
+        defaultLevel: 1,
+        effectType: 'Format',
+        exists: true,
+        fullname: 'gen3',
+        gen: 3,
+        id: '',
+        maxLevel: 99,
+        mod: 'gen3',
+        name: 'gen3',
+        noLog: false,
+        ruleTable: null,
+        ruleset: [],
+        searchShow: false,
+        sourceEffect: '',
+        tournamentShow: true,
+        unbanlist: [],
+      },
+    }
+
+    return this
+  }
 }
 
 dexes['base'] = new ModdedDex(undefined, true);

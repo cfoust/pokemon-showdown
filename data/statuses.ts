@@ -1,3 +1,7 @@
+import * as Data from '../sim/dex-data';
+
+const toID = Data.Tools.getId;
+
 export const BattleStatuses: {[k: string]: PureEffectData} = {
 	brn: {
 		name: 'brn',

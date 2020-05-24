@@ -784,7 +784,7 @@ export const BattleAbilities: {[abilityid: string]: AbilityData} = {
 	drizzle: {
 		shortDesc: "On switch-in, this Pokemon summons Rain Dance.",
 		onStart(source) {
-			for (const action of this.queue) {
+			for (const action of this.queue.actions) {
 				if (action.choice === 'runPrimal' && action.pokemon === source && source.species.id === 'kyogre') return;
 				if (action.choice !== 'runSwitch' && action.choice !== 'runPrimal') break;
 			}
@@ -797,7 +797,7 @@ export const BattleAbilities: {[abilityid: string]: AbilityData} = {
 	drought: {
 		shortDesc: "On switch-in, this Pokemon summons Sunny Day.",
 		onStart(source) {
-			for (const action of this.queue) {
+			for (const action of this.queue.actions) {
 				if (action.choice === 'runPrimal' && action.pokemon === source && source.species.id === 'groudon') return;
 				if (action.choice !== 'runSwitch' && action.choice !== 'runPrimal') break;
 			}

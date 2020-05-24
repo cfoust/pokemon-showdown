@@ -963,5 +963,3 @@ export const BattleMovedex: {[k: string]: ModdedMoveData} = {
 		basePower: 100,
 	},
 };
-
-exports.BattleMovedex = BattleMovedex;

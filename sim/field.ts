@@ -5,7 +5,6 @@
  * @license MIT
  */
 
-import {State} from './state';
 import {EffectState} from './pokemon';
 import {Dex} from './dex';
 const { getId: toID } = Dex
@@ -31,10 +30,6 @@ export class Field {
 		this.terrain = '';
 		this.terrainData = {id: ''};
 		this.pseudoWeather = {};
-	}
-
-	toJSON(): AnyObject {
-		return State.serializeField(this);
 	}
 
 	setWeather(status: string | PureEffect, source: Pokemon | 'debug' | null = null, sourceEffect: Effect | null = null) {
