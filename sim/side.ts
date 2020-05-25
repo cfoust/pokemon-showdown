@@ -50,7 +50,9 @@ export class Side {
 	foe: Side;
 	team: PokemonSet[];
 	pokemon: Pokemon[];
+
 	active: Pokemon[];
+  readonly numActive: number
 
 	pokemonLeft: number;
 	faintedLastTurn: boolean;
@@ -81,22 +83,23 @@ export class Side {
 		this.team = team;
 		this.pokemon = [];
 		for (let i = 0; i < this.team.length && i < 24; i++) {
-			// console.log("NEW POKEMON: " + (this.team[i] ? this.team[i].name : '[unidentified]'));
 			this.pokemon.push(new Pokemon(this.team[i], this));
 		}
 		for (const [i, pokemon] of this.pokemon.entries()) {
 			pokemon.position = i;
 		}
 
+    this.active = []
+    this.numActive = 0
 		switch (this.battle.gameType) {
 		case 'doubles':
-			this.active = [null!, null!];
+      this.numActive = 2
 			break;
 		case 'triples': case 'rotation':
-			this.active = [null!, null!, null!];
+      this.numActive = 3
 			break;
 		default:
-			this.active = [null!];
+      this.numActive = 1
 		}
 
 		this.pokemonLeft = this.pokemon.length;
@@ -107,7 +110,7 @@ export class Side {
 		this.sideConditions = {};
 		this.slotConditions = [];
 		// Array#fill doesn't work for this
-		for (let i = 0; i < this.active.length; i++) this.slotConditions[i] = {};
+		for (let i = 0; i < this.numActive; i++) this.slotConditions[i] = {};
 
 		this.activeRequest = null;
 		this.choice = {
@@ -142,7 +145,7 @@ export class Side {
 			switch (action.choice) {
 			case 'move':
 				let details = ``;
-				if (action.targetLoc && this.active.length > 1) details += ` ${action.targetLoc > 0 ? '+' : ''}${action.targetLoc}`;
+				if (action.targetLoc && this.numActive > 1) details += ` ${action.targetLoc > 0 ? '+' : ''}${action.targetLoc}`;
 				if (action.mega) details += (action.pokemon!.item === 'ultranecroziumz' ? ` ultra` : ` mega`);
 				if (action.zmove) details += ` zmove`;
 				if (action.maxMove) details += ` dynamax`;
@@ -321,7 +324,7 @@ export class Side {
 
 		// current request is move/switch
 		this.getChoiceIndex(); // auto-pass
-		return this.choice.actions.length >= this.active.length;
+		return this.choice.actions.length >= this.numActive;
 	}
 
 	chooseMove(moveText?: string | number, targetLoc = 0, megaDynaOrZ: 'mega' | 'zmove' | 'ultra' | 'dynamax' | '' = '') {
@@ -329,7 +332,7 @@ export class Side {
 			return this.emitChoiceError(`Can't move: You need a ${this.requestState} response`);
 		}
 		const index = this.getChoiceIndex();
-		if (index >= this.active.length) {
+		if (index >= this.numActive) {
 			return this.emitChoiceError(`Can't move: You sent more choices than unfainted Pokémon.`);
 		}
 		const autoChoose = !moveText;
@@ -430,7 +433,7 @@ export class Side {
 		if (autoChoose) {
 			targetLoc = 0;
 		} else if (this.battle.targetTypeChoices(targetType)) {
-			if (!targetLoc && this.active.length >= 2) {
+			if (!targetLoc && this.numActive >= 2) {
 				return this.emitChoiceError(`Can't move: ${move.name} needs a target`);
 			}
 			if (!this.battle.validTargetLoc(targetLoc, pokemon, targetType)) {
@@ -563,7 +566,7 @@ export class Side {
 			return this.emitChoiceError(`Can't switch: You need a ${this.requestState} response`);
 		}
 		const index = this.getChoiceIndex();
-		if (index >= this.active.length) {
+		if (index >= this.numActive) {
 			if (this.requestState === 'switch') {
 				return this.emitChoiceError(`Can't switch: You sent more switches than Pokémon that need to switch`);
 			}
@@ -577,7 +580,7 @@ export class Side {
 				return this.emitChoiceError(`Can't switch: You need to select a Pokémon to switch in`);
 			}
 			if (!this.choice.forcedSwitchesLeft) return this.choosePass();
-			slot = this.active.length;
+			slot = this.numActive;
 			while (this.choice.switchIns.has(slot) || this.pokemon[slot].fainted) slot++;
 		} else {
 			slot = parseInt(slotText!) - 1;
@@ -597,7 +600,7 @@ export class Side {
 		}
 		if (slot >= this.pokemon.length) {
 			return this.emitChoiceError(`Can't switch: You do not have a Pokémon in slot ${slot + 1} to switch to`);
-		} else if (slot < this.active.length) {
+		} else if (slot < this.numActive) {
 			return this.emitChoiceError(`Can't switch: You can't switch to an active Pokémon`);
 		} else if (this.choice.switchIns.has(slot)) {
 			return this.emitChoiceError(`Can't switch: The Pokémon in slot ${slot + 1} can only switch in once`);
@@ -696,7 +699,7 @@ export class Side {
 
 	chooseShift() {
 		const index = this.getChoiceIndex();
-		if (index >= this.active.length) {
+		if (index >= this.numActive) {
 			return this.emitChoiceError(`Can't shift: You do not have a Pokémon in slot ${index + 1}`);
 		} else if (this.requestState !== 'move') {
 			return this.emitChoiceError(`Can't shift: You can only shift during a move phase`);
@@ -721,7 +724,7 @@ export class Side {
 		let forcedPasses = 0;
 		if (this.battle.requestState === 'switch') {
 			const canSwitchOut = this.active.filter(pokemon => pokemon?.switchFlag).length;
-			const canSwitchIn = this.pokemon.slice(this.active.length).filter(pokemon => pokemon && !pokemon.fainted).length;
+			const canSwitchIn = this.pokemon.slice(this.numActive).filter(pokemon => pokemon && !pokemon.fainted).length;
 			forcedSwitches = Math.min(canSwitchOut, canSwitchIn);
 			forcedPasses = canSwitchOut - forcedSwitches;
 		}
@@ -754,7 +757,7 @@ export class Side {
 
 		const choiceStrings = (input.startsWith('team ') ? [input] : input.split(','));
 
-		if (choiceStrings.length > this.active.length) {
+		if (choiceStrings.length > this.numActive) {
 			return this.emitChoiceError(
 				`Can't make choices: You sent choices for ${choiceStrings.length} Pokémon, but this is a ${this.battle.gameType} game!`
 			);
@@ -857,13 +860,13 @@ export class Side {
 			switch (this.requestState) {
 			case 'move':
 				// auto-pass
-				while (index < this.active.length && this.active[index].fainted) {
+				while (index < this.numActive && this.active[index].fainted) {
 					this.choosePass();
 					index++;
 				}
 				break;
 			case 'switch':
-				while (index < this.active.length && !this.active[index].switchFlag) {
+				while (index < this.numActive && !this.active[index].switchFlag) {
 					this.choosePass();
 					index++;
 				}
@@ -876,7 +879,7 @@ export class Side {
 
 	choosePass(): boolean | Side {
 		const index = this.getChoiceIndex(true);
-		if (index >= this.active.length) return false;
+		if (index >= this.numActive) return false;
 		const pokemon: Pokemon = this.active[index];
 
 		switch (this.requestState) {

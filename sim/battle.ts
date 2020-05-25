@@ -2497,7 +2497,7 @@ export class Battle {
 
 			this.add('start');
 			for (const side of this.sides) {
-				for (let pos = 0; pos < side.active.length; pos++) {
+				for (let pos = 0; pos < side.numActive; pos++) {
 					this.switchIn(side.pokemon[pos], pos);
 				}
 			}
